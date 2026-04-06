@@ -1,0 +1,30 @@
+{
+  "filters": [
+    {"id": "pe_ratio", "label": "P/E ratio", "category": "Fundamentals", "metric": "pe", "operators": [">","<","between"], "defaultOp": "<", "defaultVal": 30},
+    {"id": "ps_ratio", "label": "P/S ratio", "category": "Fundamentals", "metric": "ps", "operators": [">","<","between"], "defaultOp": "<", "defaultVal": 10},
+    {"id": "market_cap", "label": "Market cap", "category": "Fundamentals", "metric": "marketCap", "operators": [">","<","between"], "defaultOp": ">", "defaultVal": "10B"},
+    {"id": "revenue_growth", "label": "Revenue growth (YoY)", "category": "Fundamentals", "metric": "revenueGrowthYOY", "operators": [">","<"], "defaultOp": ">", "defaultVal": 0.10},
+    {"id": "gross_margin", "label": "Gross margin", "category": "Fundamentals", "metric": "grossMargin", "operators": [">","<"], "defaultOp": ">", "defaultVal": 0.30},
+    {"id": "roe", "label": "ROE", "category": "Fundamentals", "metric": "roe", "operators": [">","<"], "defaultOp": ">", "defaultVal": 0.10},
+    {"id": "debt_equity", "label": "Debt/Equity", "category": "Fundamentals", "metric": "totalDebt/totalEquity", "operators": [">","<"], "defaultOp": "<", "defaultVal": 1.5},
+    {"id": "pe_trend", "label": "P/E trend", "category": "Valuation Trend", "metric": "pe", "type": "trend", "operators": ["expanding","contracting"], "defaultOp": "contracting", "defaultQuarters": 4},
+    {"id": "ps_trend", "label": "P/S trend", "category": "Valuation Trend", "metric": "ps", "type": "trend", "operators": ["expanding","contracting"], "defaultOp": "contracting", "defaultQuarters": 4},
+    {"id": "rsi", "label": "RSI", "category": "Technical", "metric": "rsi", "operators": [">","<","between"], "defaultOp": "<", "defaultVal": 65},
+    {"id": "vs_200ma", "label": "Price vs 200MA", "category": "Technical", "metric": "vs200MA", "operators": [">","<"], "defaultOp": ">", "defaultVal": 0},
+    {"id": "week52_position", "label": "52-week position", "category": "Technical", "metric": "week52Position", "operators": [">","<"], "defaultOp": ">", "defaultVal": 0.5},
+    {"id": "gaap_gap", "label": "Non-GAAP vs GAAP spread", "category": "Earnings Quality", "metric": "gaapGap", "type": "trend", "operators": ["widening","narrowing"], "defaultOp": "narrowing", "defaultQuarters": 4},
+    {"id": "analyst_buy_pct", "label": "Analyst buy %", "category": "Analyst", "metric": "buyPct", "operators": [">","<"], "defaultOp": ">", "defaultVal": 0.60},
+    {"id": "price_target_upside", "label": "Price target upside", "category": "Analyst", "metric": "ptUpside", "operators": [">","<"], "defaultOp": ">", "defaultVal": 0.10},
+    {"id": "beat_streak", "label": "Earnings beat streak", "category": "Earnings Momentum", "metric": "beatStreak", "operators": [">","<"], "defaultOp": ">", "defaultVal": 2},
+    {"id": "surprise_trend", "label": "Surprise magnitude trend", "category": "Earnings Momentum", "metric": "surpriseTrend", "operators": ["improving","deteriorating"], "defaultOp": "improving", "defaultQuarters": 4}
+  ],
+  "flags": [
+    {"id": "multiple_compression", "label": "Multiple compression", "color": "red", "signal": "P/E contracting while EPS growing for 2+ quarters"},
+    {"id": "gaap_gap_widening", "label": "GAAP gap widening", "color": "red", "signal": "Non-GAAP adjustments growing as % of earnings over 3+ quarters"},
+    {"id": "miss_streak", "label": "Miss streak", "color": "red", "signal": "2+ consecutive earnings misses"},
+    {"id": "decelerating_growth", "label": "Decelerating growth", "color": "amber", "signal": "Revenue growth slowing for 3+ consecutive quarters"},
+    {"id": "margin_squeeze", "label": "Margin squeeze", "color": "amber", "signal": "Gross margin declining while revenue grows"},
+    {"id": "multiple_rerating", "label": "Multiple re-rating", "color": "green", "signal": "P/E expanding while earnings accelerating — justified expansion"},
+    {"id": "estimate_revision_up", "label": "Estimate revision up", "color": "green", "signal": "Analyst EPS estimates revised upward in last 60 days"}
+  ]
+}

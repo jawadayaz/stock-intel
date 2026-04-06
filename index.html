@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Intel v01.00</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #e6edf3;
+    --muted: #7d8590; --accent: #238636; --accent-hover: #2ea043;
+    --blue: #1f6feb; --red: #da3633; --amber: #e3b341; --green: #238636;
+    --radius: 6px; --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
+  a { color: var(--blue); text-decoration: none; }
+  button { cursor: pointer; font-family: var(--font); font-size: 13px; }
+  input, select { font-family: var(--font); font-size: 13px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; }
+  input:focus, select:focus { outline: none; border-color: var(--blue); }
+
+  /* Layout */
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 24px; height: 52px; }
+  .header-logo { font-weight: 700; font-size: 16px; color: var(--text); }
+  .header-version { font-size: 11px; color: var(--muted); background: var(--border); padding: 2px 6px; border-radius: 10px; }
+  .nav { display: flex; gap: 0; height: 100%; }
+  .nav-tab { padding: 0 16px; height: 100%; display: flex; align-items: center; color: var(--muted); border-bottom: 2px solid transparent; font-size: 13px; background: none; border-top: none; border-left: none; border-right: none; transition: color .15s; }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--text); border-bottom-color: var(--blue); }
+  .main { display: flex; flex: 1; }
+  .content { flex: 1; padding: 24px; overflow: auto; }
+
+  /* Sidebar */
+  .sidebar { width: 280px; background: var(--surface); border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; flex-shrink: 0; }
+  .sidebar-section { margin-bottom: 16px; }
+  .sidebar-section-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; cursor: pointer; user-select: none; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .sidebar-section-header:hover { color: var(--text); }
+  .badge { background: var(--blue); color: #fff; border-radius: 10px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
+
+  /* Filter row */
+  .filter-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+  .filter-label { flex: 1; font-size: 12px; color: var(--muted); }
+  .filter-row select { padding: 3px 4px; font-size: 11px; }
+  .filter-row input[type=number] { width: 70px; padding: 3px 5px; }
+  .filter-row input[type=checkbox] { width: 14px; height: 14px; }
+
+  /* Flag toggle */
+  .flag-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .flag-toggle { position: relative; width: 32px; height: 18px; flex-shrink: 0; }
+  .flag-toggle input { opacity: 0; width: 0; height: 0; }
+  .flag-slider { position: absolute; inset: 0; background: var(--border); border-radius: 18px; transition: .2s; cursor: pointer; }
+  .flag-slider:before { content: ""; position: absolute; height: 12px; width: 12px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .flag-toggle input:checked + .flag-slider { background: var(--blue); }
+  .flag-toggle input:checked + .flag-slider:before { transform: translateX(14px); }
+  .flag-label { flex: 1; font-size: 12px; }
+  .flag-require { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+
+  /* Buttons */
+  .btn { padding: 6px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background .15s; }
+  .btn:hover { background: var(--border); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-danger { background: transparent; border-color: var(--red); color: var(--red); }
+  .btn-danger:hover { background: var(--red); color: #fff; }
+  .btn-sm { padding: 3px 8px; font-size: 12px; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .metric-cards { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 20px; min-width: 140px; }
+  .metric-card-value { font-size: 28px; font-weight: 700; color: var(--text); }
+  .metric-card-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 12px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; cursor: pointer; user-select: none; white-space: nowrap; }
+  th:hover { color: var(--text); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .sort-arrow { display: inline; margin-left: 4px; }
+
+  /* Pills */
+  .pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin: 2px; white-space: nowrap; }
+  .pill-red { background: rgba(218,54,51,.2); color: #ff7b7a; border: 1px solid rgba(218,54,51,.4); }
+  .pill-amber { background: rgba(227,179,65,.2); color: #e3b341; border: 1px solid rgba(227,179,65,.4); }
+  .pill-green { background: rgba(35,134,54,.2); color: #3fb950; border: 1px solid rgba(35,134,54,.4); }
+
+  /* Slide panel */
+  .slide-panel { position: fixed; right: 0; top: 0; bottom: 0; width: 480px; background: var(--surface); border-left: 1px solid var(--border); z-index: 100; display: flex; flex-direction: column; transform: translateX(100%); transition: transform .25s ease; }
+  .slide-panel.open { transform: translateX(0); }
+  .slide-panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .slide-panel-body { flex: 1; overflow-y: auto; padding: 20px; }
+  .close-btn { background: none; border: none; color: var(--muted); font-size: 20px; line-height: 1; padding: 0; }
+  .close-btn:hover { color: var(--text); }
+
+  /* Score */
+  .credibility-score { font-size: 48px; font-weight: 800; text-align: center; padding: 16px 0; }
+  .score-high { color: #3fb950; }
+  .score-mid { color: #e3b341; }
+  .score-low { color: #ff7b7a; }
+  .score-label { text-align: center; color: var(--muted); font-size: 12px; margin-top: -8px; margin-bottom: 16px; }
+  .quote-block { background: var(--bg); border-left: 3px solid var(--blue); padding: 10px 14px; margin: 8px 0; font-size: 13px; color: var(--muted); border-radius: 0 var(--radius) var(--radius) 0; }
+
+  /* Misc */
+  .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); }
+  .empty-state h3 { font-size: 18px; color: var(--text); margin-bottom: 8px; }
+  .loader { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .positive { color: #3fb950; }
+  .negative { color: #ff7b7a; }
+  .controls-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .search-input { flex: 1; max-width: 300px; }
+  .footer { border-top: 1px solid var(--border); padding: 12px 24px; text-align: center; font-size: 11px; color: var(--muted); }
+  .screen-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .screen-card-meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .screen-card-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .tag { display: inline-block; background: var(--border); border-radius: 4px; padding: 2px 6px; font-size: 11px; margin: 2px; }
+  textarea { font-family: var(--font); font-size: 13px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; width: 100%; resize: vertical; }
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+  .form-row { display: flex; gap: 10px; align-items: flex-end; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .inline-loader { display: flex; align-items: center; gap: 8px; color: var(--muted); padding: 24px 0; }
+  .alert { padding: 10px 14px; border-radius: var(--radius); margin-bottom: 12px; font-size: 13px; }
+  .alert-error { background: rgba(218,54,51,.1); border: 1px solid rgba(218,54,51,.3); color: #ff7b7a; }
+  .alert-success { background: rgba(35,134,54,.1); border: 1px solid rgba(35,134,54,.3); color: #3fb950; }
+  .autocomplete-wrap { position: relative; }
+  .autocomplete-list { position: absolute; z-index: 50; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-height: 200px; overflow-y: auto; }
+  .autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: 13px; display: flex; gap: 10px; }
+  .autocomplete-item:hover { background: var(--border); }
+  .autocomplete-ticker { font-weight: 700; color: var(--blue); }
+  .history-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .digest-html { font-family: var(--font); font-size: 13px; }
+  .digest-html h2, .digest-html h3 { color: var(--text); margin: 16px 0 8px; }
+  .digest-html p { color: var(--muted); margin: 4px 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── Config ───────────────────────────────────────────────────────────────
+const WORKER_URL = "REPLACE_WITH_WORKER_URL";
+
+// ─── API helpers ──────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const res = await fetch(`${WORKER_URL}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...opts
+  });
+  return res.json();
+}
+
+// ─── Utility ──────────────────────────────────────────────────────────────
+function fmt(val, suffix = "", decimals = 2) {
+  if (val === null || val === undefined) return "—";
+  const n = Number(val);
+  if (isNaN(n)) return "—";
+  return n.toFixed(decimals) + suffix;
+}
+function fmtPct(val) { return fmt(val ? val * 100 : null, "%", 1); }
+function fmtCap(val) {
+  if (!val) return "—";
+  if (val >= 1e12) return "$" + (val / 1e12).toFixed(2) + "T";
+  if (val >= 1e9)  return "$" + (val / 1e9).toFixed(2) + "B";
+  if (val >= 1e6)  return "$" + (val / 1e6).toFixed(2) + "M";
+  return "$" + val.toFixed(0);
+}
+function fmtDate(ts) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// ─── Flag definitions ─────────────────────────────────────────────────────
+const FLAG_COLORS = { red: "pill-red", amber: "pill-amber", green: "pill-green" };
+const FLAG_DEFS_DEFAULT = [
+  { id: "multiple_compression", label: "Multiple compression", color: "red" },
+  { id: "gaap_gap_widening", label: "GAAP gap widening", color: "red" },
+  { id: "miss_streak", label: "Miss streak", color: "red" },
+  { id: "decelerating_growth", label: "Decelerating growth", color: "amber" },
+  { id: "margin_squeeze", label: "Margin squeeze", color: "amber" },
+  { id: "multiple_rerating", label: "Multiple re-rating", color: "green" },
+  { id: "estimate_revision_up", label: "Estimate revision up", color: "green" },
+];
+
+function FlagPill({ flagId, flagDefs }) {
+  const def = flagDefs.find(f => f.id === flagId) || { label: flagId, color: "amber" };
+  return <span className={`pill ${FLAG_COLORS[def.color] || "pill-amber"}`}>{def.label}</span>;
+}
+
+// ─── Sidebar filter panel ─────────────────────────────────────────────────
+const FILTER_CATEGORIES = ["Fundamentals", "Valuation Trend", "Technical", "Earnings Quality", "Analyst", "Earnings Momentum"];
+
+function FilterPanel({ criteria, activeFilters, setActiveFilters, activeFlags, setActiveFlags, requiredFlags, setRequiredFlags, savedScreens, onLoadScreen, onSaveScreen }) {
+  const [collapsed, setCollapsed] = useState({});
+  const [savedScreenName, setSavedScreenName] = useState("");
+  const [showSave, setShowSave] = useState(false);
+
+  function toggleSection(cat) { setCollapsed(p => ({ ...p, [cat]: !p[cat] })); }
+
+  function getActiveFilter(id) { return activeFilters.find(f => f.id === id); }
+  function toggleFilter(filterDef) {
+    const existing = getActiveFilter(filterDef.id);
+    if (existing) setActiveFilters(p => p.filter(f => f.id !== filterDef.id));
+    else setActiveFilters(p => [...p, { id: filterDef.id, op: filterDef.defaultOp, val: filterDef.defaultVal, val2: null }]);
+  }
+  function updateFilter(id, key, value) {
+    setActiveFilters(p => p.map(f => f.id === id ? { ...f, [key]: value } : f));
+  }
+
+  return (
+    <div className="sidebar">
+      {/* Saved screens dropdown */}
+      <div className="form-group">
+        <label className="form-label">Load saved screen</label>
+        <div className="form-row">
+          <select style={{ flex: 1 }} onChange={e => { if (e.target.value) onLoadScreen(e.target.value); e.target.value = ""; }}>
+            <option value="">— select —</option>
+            {savedScreens.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="form-group">
+        {showSave ? (
+          <div className="form-row">
+            <input value={savedScreenName} onChange={e => setSavedScreenName(e.target.value)} placeholder="Screen name" style={{ flex: 1 }} />
+            <button className="btn btn-sm btn-primary" onClick={() => { onSaveScreen(savedScreenName); setSavedScreenName(""); setShowSave(false); }}>Save</button>
+            <button className="btn btn-sm" onClick={() => setShowSave(false)}>×</button>
+          </div>
+        ) : (
+          <button className="btn btn-sm" style={{ width: "100%" }} onClick={() => setShowSave(true)}>Save current screen</button>
+        )}
+      </div>
+      <hr className="divider" />
+
+      {/* Filters by category */}
+      {FILTER_CATEGORIES.map(cat => {
+        const catFilters = (criteria?.filters || []).filter(f => f.category === cat);
+        if (!catFilters.length) return null;
+        const activeCount = catFilters.filter(f => getActiveFilter(f.id)).length;
+        return (
+          <div className="sidebar-section" key={cat}>
+            <div className="sidebar-section-header" onClick={() => toggleSection(cat)}>
+              <span>{cat}</span>
+              <span>{activeCount > 0 && <span className="badge">{activeCount}</span>} {collapsed[cat] ? "▸" : "▾"}</span>
+            </div>
+            {!collapsed[cat] && catFilters.map(f => {
+              const active = getActiveFilter(f.id);
+              return (
+                <div className="filter-row" key={f.id}>
+                  <input type="checkbox" checked={!!active} onChange={() => toggleFilter(f)} id={`f_${f.id}`} />
+                  <label htmlFor={`f_${f.id}`} className="filter-label">{f.label}</label>
+                  {active && (
+                    f.type === "trend" ? (
+                      <select value={active.op} onChange={e => updateFilter(f.id, "op", e.target.value)}>
+                        {(f.operators || []).map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : (
+                      <>
+                        <select value={active.op} onChange={e => updateFilter(f.id, "op", e.target.value)}>
+                          {(f.operators || []).map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                        <input type={f.metric === "marketCap" ? "text" : "number"} value={active.val || ""} onChange={e => updateFilter(f.id, "val", e.target.value)} />
+                        {active.op === "between" && <input type="number" value={active.val2 || ""} placeholder="max" onChange={e => updateFilter(f.id, "val2", e.target.value)} />}
+                      </>
+                    )
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+
+      <hr className="divider" />
+      <div className="sidebar-section-header" style={{ cursor: "default" }}>
+        <span>Flags</span>
+      </div>
+      {(criteria?.flags || FLAG_DEFS_DEFAULT).map(flag => (
+        <div className="flag-row" key={flag.id}>
+          <label className="flag-toggle">
+            <input type="checkbox" checked={activeFlags.includes(flag.id)} onChange={() => {
+              setActiveFlags(p => p.includes(flag.id) ? p.filter(f => f !== flag.id) : [...p, flag.id]);
+            }} />
+            <span className="flag-slider"></span>
+          </label>
+          <span className={`pill ${FLAG_COLORS[flag.color] || "pill-amber"}`} style={{ fontSize: 11 }}>{flag.label}</span>
+          {activeFlags.includes(flag.id) && (
+            <label className="flag-require">
+              <input type="checkbox" checked={requiredFlags.includes(flag.id)} onChange={() => {
+                setRequiredFlags(p => p.includes(flag.id) ? p.filter(f => f !== flag.id) : [...p, flag.id]);
+              }} />
+              require
+            </label>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Deep dive panel ──────────────────────────────────────────────────────
+function DeepDivePanel({ stock, onClose }) {
+  const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!stock) return;
+    setLoading(true); setResult(null); setError(null);
+    api(`/api/deepdive/${encodeURIComponent(stock.ticker)}`, { method: "POST" })
+      .then(r => { if (r.error) setError(r.error); else setResult(r); })
+      .catch(() => setError("Request failed"))
+      .finally(() => setLoading(false));
+  }, [stock?.ticker]);
+
+  if (!stock) return null;
+  const isIndian = stock.exchange === "NSE" || stock.exchange === "BSE";
+  const scoreClass = result?.credibilityScore >= 7 ? "score-high" : result?.credibilityScore >= 4 ? "score-mid" : "score-low";
+
+  return (
+    <div className={`slide-panel ${stock ? "open" : ""}`}>
+      <div className="slide-panel-header">
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>{stock.ticker} — Deep Dive</div>
+          <div style={{ color: "var(--muted)", fontSize: 12 }}>{stock.name}</div>
+        </div>
+        <button className="close-btn" onClick={onClose}>×</button>
+      </div>
+      <div className="slide-panel-body">
+        {isIndian && <div className="alert alert-error">Transcript analysis not available for Indian exchanges.</div>}
+        {loading && !isIndian && <div className="inline-loader"><span className="loader"></span>Fetching SEC EDGAR filing and running analysis...</div>}
+        {error && !loading && <div className="alert alert-error">{error}</div>}
+        {result && !loading && (
+          <>
+            <div className={`credibility-score ${scoreClass}`}>{result.credibilityScore ?? "—"}<span style={{ fontSize: 18 }}>/10</span></div>
+            <div className="score-label">Management Credibility Score</div>
+
+            {result.missReasons?.length > 0 && (
+              <>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Stated reasons for miss</div>
+                <ul style={{ paddingLeft: 16, color: "var(--muted)", fontSize: 13 }}>
+                  {result.missReasons.map((r, i) => <li key={i} style={{ marginBottom: 4 }}>{r}</li>)}
+                </ul>
+              </>
+            )}
+            {result.guidanceTone && (
+              <>
+                <div style={{ fontWeight: 600, margin: "16px 0 8px" }}>Forward guidance tone</div>
+                <p style={{ color: "var(--muted)", fontSize: 13 }}>{result.guidanceTone}</p>
+              </>
+            )}
+            {result.hedgingFlags?.length > 0 && (
+              <>
+                <div style={{ fontWeight: 600, margin: "16px 0 8px" }}>Hedging language flagged</div>
+                {result.hedgingFlags.map((h, i) => <div key={i} className="quote-block">{h}</div>)}
+              </>
+            )}
+            {result.keyQuotes?.length > 0 && (
+              <>
+                <div style={{ fontWeight: 600, margin: "16px 0 8px" }}>Key quotes</div>
+                {result.keyQuotes.map((q, i) => <div key={i} className="quote-block">"{q}"</div>)}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Screener tab ─────────────────────────────────────────────────────────
+function ScreenerTab({ criteria, savedScreens, setSavedScreens }) {
+  const [universe, setUniverse] = useState("SP500_NASDAQ");
+  const [activeFilters, setActiveFilters] = useState([]);
+  const [activeFlags, setActiveFlags] = useState([]);
+  const [requiredFlags, setRequiredFlags] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState(null);
+  const [sortKey, setSortKey] = useState("marketCap");
+  const [sortDir, setSortDir] = useState(-1);
+  const [deepDiveStock, setDeepDiveStock] = useState(null);
+  const [error, setError] = useState(null);
+
+  async function runScreen() {
+    setLoading(true); setError(null); setResults(null);
+    try {
+      const filters = encodeURIComponent(JSON.stringify(activeFilters));
+      const flags = encodeURIComponent(JSON.stringify(requiredFlags));
+      const data = await api(`/api/screen?universe=${universe}&filters=${filters}&flags=${flags}`);
+      setResults(data);
+    } catch (e) { setError("Screen failed: " + e.message); }
+    setLoading(false);
+  }
+
+  async function addToWatchlist(stock) {
+    await api("/api/watchlist", { method: "POST", body: JSON.stringify({ ticker: stock.ticker, name: stock.name, exchange: stock.exchange }) });
+  }
+
+  async function saveScreen(name) {
+    if (!name) return;
+    const screen = { name, universe, filters: activeFilters, requiredFlags, activeFlags };
+    await api("/api/screens", { method: "POST", body: JSON.stringify(screen) });
+    const updated = await api("/api/screens");
+    setSavedScreens(updated);
+  }
+
+  function loadScreen(id) {
+    const s = savedScreens.find(s => s.id === id);
+    if (!s) return;
+    setUniverse(s.universe || "SP500_NASDAQ");
+    setActiveFilters(s.filters || []);
+    setRequiredFlags(s.requiredFlags || []);
+    setActiveFlags(s.activeFlags || []);
+  }
+
+  function sort(key) {
+    if (sortKey === key) setSortDir(d => -d);
+    else { setSortKey(key); setSortDir(-1); }
+  }
+
+  const sortedResults = results?.results ? [...results.results].sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (av === null || av === undefined) return 1;
+    if (bv === null || bv === undefined) return -1;
+    return sortDir * (av < bv ? -1 : av > bv ? 1 : 0);
+  }) : [];
+
+  const flagDefs = criteria?.flags || FLAG_DEFS_DEFAULT;
+
+  function SortTh({ k, children }) {
+    return <th onClick={() => sort(k)}>{children}{sortKey === k && <span className="sort-arrow">{sortDir > 0 ? " ↑" : " ↓"}</span>}</th>;
+  }
+
+  const activeFilterDefs = (criteria?.filters || []).filter(f => activeFilters.find(af => af.id === f.id));
+
+  return (
+    <div style={{ display: "flex", flex: 1 }}>
+      <FilterPanel
+        criteria={criteria}
+        activeFilters={activeFilters} setActiveFilters={setActiveFilters}
+        activeFlags={activeFlags} setActiveFlags={setActiveFlags}
+        requiredFlags={requiredFlags} setRequiredFlags={setRequiredFlags}
+        savedScreens={savedScreens}
+        onLoadScreen={loadScreen}
+        onSaveScreen={saveScreen}
+      />
+      <div className="content">
+        {/* Controls bar */}
+        <div className="controls-bar">
+          <select value={universe} onChange={e => setUniverse(e.target.value)}>
+            <option value="SP500_NASDAQ">S&P 500 + NASDAQ 100</option>
+            <option value="NIFTY500">Nifty 500</option>
+            <option value="BOTH">Both</option>
+          </select>
+          <button className="btn btn-primary" onClick={runScreen} disabled={loading}>
+            {loading && <span className="loader"></span>}
+            Run Screen
+          </button>
+        </div>
+
+        {error && <div className="alert alert-error">{error}</div>}
+
+        {results && (
+          <>
+            <div className="metric-cards">
+              <div className="metric-card">
+                <div className="metric-card-value">{results.count}</div>
+                <div className="metric-card-label">Stocks matched</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-card-value">{results.universe}</div>
+                <div className="metric-card-label">Universe</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-card-value">{fmtDate(results.runAt)}</div>
+                <div className="metric-card-label">Run date</div>
+              </div>
+            </div>
+
+            {sortedResults.length === 0 ? (
+              <div className="empty-state"><h3>No matches</h3><p>Try relaxing your filters.</p></div>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <SortTh k="ticker">Ticker</SortTh>
+                      <SortTh k="name">Name</SortTh>
+                      <SortTh k="marketCap">Mkt Cap</SortTh>
+                      {activeFilterDefs.map(f => <SortTh key={f.id} k={f.metric || f.id}>{f.label}</SortTh>)}
+                      <th>Flags</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedResults.map(stock => (
+                      <tr key={stock.ticker}>
+                        <td><strong style={{ color: "var(--blue)" }}>{stock.ticker}</strong></td>
+                        <td style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{stock.name}</td>
+                        <td>{fmtCap(stock.marketCap)}</td>
+                        {activeFilterDefs.map(f => {
+                          const metric = f.metric === "totalDebt/totalEquity" ? "totalDebt" : f.metric;
+                          const val = stock[metric] ?? stock[f.id];
+                          const isPercent = ["revenueGrowthYOY","grossMargin","roe","buyPct","ptUpside","vs200MA"].includes(f.id);
+                          return <td key={f.id}>{isPercent ? fmtPct(val) : fmt(val)}</td>;
+                        })}
+                        <td style={{ maxWidth: 200 }}>{stock.flags?.map(fid => <FlagPill key={fid} flagId={fid} flagDefs={flagDefs} />)}</td>
+                        <td>
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button className="btn btn-sm" onClick={() => addToWatchlist(stock)} title="Add to watchlist">+ Watch</button>
+                            <button className="btn btn-sm" onClick={() => setDeepDiveStock(stock)} title="Deep dive (US only)">Dive</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+
+        {!results && !loading && (
+          <div className="empty-state">
+            <h3>Configure your screen</h3>
+            <p>Select filters from the left panel, then click Run Screen.</p>
+          </div>
+        )}
+        {loading && (
+          <div className="inline-loader" style={{ justifyContent: "center", padding: 48 }}>
+            <span className="loader"></span>Screening universe... this may take 30-60 seconds.
+          </div>
+        )}
+      </div>
+
+      <DeepDivePanel stock={deepDiveStock} onClose={() => setDeepDiveStock(null)} />
+    </div>
+  );
+}
+
+// ─── Watchlist tab ────────────────────────────────────────────────────────
+function WatchlistTab() {
+  const [watchlist, setWatchlist] = useState([]);
+  const [digest, setDigest] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [addQuery, setAddQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchTimeout = useRef(null);
+
+  useEffect(() => {
+    Promise.all([
+      api("/api/watchlist"),
+      api("/api/digest/last")
+    ]).then(([wl, d]) => { setWatchlist(wl || []); setDigest(d); setLoading(false); });
+  }, []);
+
+  function searchTickers(q) {
+    clearTimeout(searchTimeout.current);
+    if (q.length < 2) { setSuggestions([]); return; }
+    searchTimeout.current = setTimeout(async () => {
+      const res = await api(`/api/symbol-search?q=${encodeURIComponent(q)}&exchange=US`);
+      setSuggestions((res || []).slice(0, 8));
+      setShowSuggestions(true);
+    }, 400);
+  }
+
+  async function addTicker(item) {
+    const ticker = item?.symbol || addQuery.toUpperCase();
+    const name = item?.description || ticker;
+    const exchange = item?.exchange || (ticker.endsWith(".NS") ? "NSE" : ticker.endsWith(".BO") ? "BSE" : "US");
+    await api("/api/watchlist", { method: "POST", body: JSON.stringify({ ticker, name, exchange }) });
+    const updated = await api("/api/watchlist");
+    setWatchlist(updated);
+    setAddQuery(""); setSuggestions([]); setShowSuggestions(false);
+  }
+
+  async function remove(id) {
+    await api(`/api/watchlist/${id}`, { method: "DELETE" });
+    setWatchlist(p => p.filter(w => w.id !== id));
+  }
+
+  return (
+    <div className="content">
+      <div className="section-title">Watchlist</div>
+
+      {/* Add ticker */}
+      <div className="card" style={{ marginBottom: 20, maxWidth: 400 }}>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label">Add ticker</label>
+          <div className="autocomplete-wrap">
+            <div className="form-row">
+              <input
+                className="search-input" value={addQuery}
+                onChange={e => { setAddQuery(e.target.value); searchTickers(e.target.value); }}
+                onKeyDown={e => { if (e.key === "Enter") addTicker(null); }}
+                placeholder="AAPL or RELIANCE.NS"
+                style={{ flex: 1 }}
+              />
+              <button className="btn btn-primary btn-sm" onClick={() => addTicker(null)}>Add</button>
+            </div>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="autocomplete-list">
+                {suggestions.map(s => (
+                  <div key={s.symbol} className="autocomplete-item" onClick={() => addTicker(s)}>
+                    <span className="autocomplete-ticker">{s.symbol}</span>
+                    <span style={{ color: "var(--muted)" }}>{s.description}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="inline-loader"><span className="loader"></span>Loading...</div>
+      ) : watchlist.length === 0 ? (
+        <div className="empty-state"><h3>Watchlist is empty</h3><p>Add tickers above or from the Screener tab.</p></div>
+      ) : (
+        <div className="table-wrap" style={{ marginBottom: 32 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Ticker</th><th>Name</th><th>Exchange</th><th>Added</th><th>Price</th><th>Change</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {watchlist.map(item => (
+                <tr key={item.id}>
+                  <td><strong style={{ color: "var(--blue)" }}>{item.ticker}</strong></td>
+                  <td>{item.name}</td>
+                  <td><span className="tag">{item.exchange}</span></td>
+                  <td style={{ color: "var(--muted)" }}>{fmtDate(item.addedAt)}</td>
+                  <td>{item.stockData?.price ? "$" + item.stockData.price.toFixed(2) : "—"}</td>
+                  <td className={item.stockData?.change >= 0 ? "positive" : "negative"}>
+                    {item.stockData?.change != null ? (item.stockData.change > 0 ? "+" : "") + item.stockData.change.toFixed(2) + "%" : "—"}
+                  </td>
+                  <td><button className="btn btn-sm btn-danger" onClick={() => remove(item.id)}>Remove</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Last digest */}
+      <div className="section-title">Last Digest</div>
+      {digest ? (
+        <div className="card">
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
+            Sent: {fmtDate(digest.sentAt)} &nbsp; Status: <span className={digest.status === "sent" ? "positive" : "negative"}>{digest.status}</span>
+          </div>
+          <div className="digest-html" dangerouslySetInnerHTML={{ __html: digest.html }} />
+        </div>
+      ) : (
+        <div className="card" style={{ color: "var(--muted)", textAlign: "center", padding: 32 }}>No digest sent yet. First digest will arrive at 05:00 IST.</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Screens tab ──────────────────────────────────────────────────────────
+function ScreensTab({ savedScreens, setSavedScreens }) {
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api("/api/screens").then(s => setSavedScreens(s || []));
+  }, []);
+
+  async function deleteScreen(id) {
+    await api(`/api/screens/${id}`, { method: "DELETE" });
+    setSavedScreens(p => p.filter(s => s.id !== id));
+  }
+
+  async function runScreen(screen) {
+    setLoading(screen.id);
+    const filters = encodeURIComponent(JSON.stringify(screen.filters || []));
+    const flags = encodeURIComponent(JSON.stringify(screen.requiredFlags || []));
+    const data = await api(`/api/screen?universe=${screen.universe || "SP500_NASDAQ"}&filters=${filters}&flags=${flags}`);
+    // Update screen with latest count
+    const updated = savedScreens.map(s => s.id === screen.id ? { ...s, lastRun: Date.now(), lastMatchCount: data.count } : s);
+    await api("/api/screens", { method: "POST", body: JSON.stringify(updated.find(s => s.id === screen.id)) });
+    setSavedScreens(updated);
+    setLoading(false);
+  }
+
+  return (
+    <div className="content">
+      <div className="section-title">Saved Screens</div>
+      {savedScreens.length === 0 ? (
+        <div className="empty-state"><h3>No saved screens</h3><p>Build a screen in the Screener tab and save it.</p></div>
+      ) : (
+        savedScreens.map(screen => (
+          <div className="screen-card" key={screen.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <strong style={{ fontSize: 15 }}>{screen.name}</strong>
+                <div className="screen-card-meta">
+                  <span className="tag">{screen.universe || "SP500_NASDAQ"}</span>
+                  &nbsp; {screen.filters?.length || 0} filters &nbsp; {screen.requiredFlags?.length || 0} required flags
+                  {screen.lastRun && <> &nbsp; Last run: {fmtDate(screen.lastRun)}</>}
+                  {screen.lastMatchCount != null && <> &nbsp; <strong>{screen.lastMatchCount}</strong> matches</>}
+                </div>
+              </div>
+            </div>
+            <div className="screen-card-actions">
+              <button className="btn btn-sm btn-primary" onClick={() => runScreen(screen)} disabled={loading === screen.id}>
+                {loading === screen.id && <span className="loader"></span>}Run now
+              </button>
+              <button className="btn btn-sm btn-danger" onClick={() => deleteScreen(screen.id)}>Delete</button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ─── Settings tab ─────────────────────────────────────────────────────────
+function SettingsTab({ criteria, setCriteria }) {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [testEmailStatus, setTestEmailStatus] = useState(null);
+  const [cronStatus, setCronStatus] = useState(null);
+  const [showAddFilter, setShowAddFilter] = useState(false);
+  const [showAddFlag, setShowAddFlag] = useState(false);
+  const [newFilter, setNewFilter] = useState({ label: "", category: "Fundamentals", metric: "", defaultOp: "<", defaultVal: 0 });
+  const [newFlag, setNewFlag] = useState({ label: "", color: "green", signal: "" });
+
+  useEffect(() => {
+    api("/api/cron-status").then(s => setCronStatus(s));
+  }, []);
+
+  async function saveCriteria() {
+    setSaving(true);
+    await api("/api/criteria", { method: "POST", body: JSON.stringify(criteria) });
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function sendTestEmail() {
+    setTestEmailStatus("sending");
+    const res = await api("/api/test-email", { method: "POST" });
+    setTestEmailStatus(res.success ? "sent" : "failed");
+  }
+
+  function removeFilter(id) { setCriteria(p => ({ ...p, filters: p.filters.filter(f => f.id !== id) })); }
+  function removeFlag(id) { setCriteria(p => ({ ...p, flags: p.flags.filter(f => f.id !== id) })); }
+
+  function addFilter() {
+    if (!newFilter.label) return;
+    const f = { ...newFilter, id: newFilter.label.toLowerCase().replace(/\s+/g, "_"), operators: [">", "<"], type: "simple" };
+    setCriteria(p => ({ ...p, filters: [...(p.filters || []), f] }));
+    setNewFilter({ label: "", category: "Fundamentals", metric: "", defaultOp: "<", defaultVal: 0 });
+    setShowAddFilter(false);
+  }
+
+  function addFlag() {
+    if (!newFlag.label) return;
+    const f = { ...newFlag, id: newFlag.label.toLowerCase().replace(/\s+/g, "_") };
+    setCriteria(p => ({ ...p, flags: [...(p.flags || []), f] }));
+    setNewFlag({ label: "", color: "green", signal: "" });
+    setShowAddFlag(false);
+  }
+
+  return (
+    <div className="content">
+      {/* Criteria manager — Filters */}
+      <div className="section-title">Criteria Manager — Filters</div>
+      <div className="table-wrap card" style={{ marginBottom: 20 }}>
+        <table>
+          <thead>
+            <tr><th>Metric</th><th>Category</th><th>Default op</th><th>Default value</th><th></th></tr>
+          </thead>
+          <tbody>
+            {(criteria?.filters || []).map(f => (
+              <tr key={f.id}>
+                <td><strong>{f.label}</strong></td>
+                <td><span className="tag">{f.category}</span></td>
+                <td>{f.defaultOp}</td>
+                <td>{f.defaultVal}</td>
+                <td><button className="btn btn-sm btn-danger" onClick={() => removeFilter(f.id)}>Remove</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {showAddFilter ? (
+        <div className="card" style={{ maxWidth: 480, marginBottom: 12 }}>
+          <div className="form-group">
+            <label className="form-label">Label</label>
+            <input value={newFilter.label} onChange={e => setNewFilter(p => ({ ...p, label: e.target.value }))} style={{ width: "100%" }} />
+          </div>
+          <div className="form-row">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Category</label>
+              <select value={newFilter.category} onChange={e => setNewFilter(p => ({ ...p, category: e.target.value }))} style={{ width: "100%" }}>
+                {FILTER_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Type</label>
+              <select disabled style={{ width: "100%" }}>
+                <option>Simple</option>
+                <option>Trend</option>
+                <option disabled>Formula (coming soon)</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Metric key</label>
+              <input value={newFilter.metric} onChange={e => setNewFilter(p => ({ ...p, metric: e.target.value }))} placeholder="e.g. peTTM" style={{ width: "100%" }} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Default value</label>
+              <input type="number" value={newFilter.defaultVal} onChange={e => setNewFilter(p => ({ ...p, defaultVal: e.target.value }))} style={{ width: "100%" }} />
+            </div>
+          </div>
+          <div className="form-row">
+            <button className="btn btn-primary btn-sm" onClick={addFilter}>Add Filter</button>
+            <button className="btn btn-sm" onClick={() => setShowAddFilter(false)}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn btn-sm" style={{ marginBottom: 20 }} onClick={() => setShowAddFilter(true)}>+ Add filter</button>
+      )}
+
+      {/* Criteria manager — Flags */}
+      <div className="section-title">Criteria Manager — Flags</div>
+      <div className="table-wrap card" style={{ marginBottom: 20 }}>
+        <table>
+          <thead>
+            <tr><th>Flag</th><th>Color</th><th>Signal description</th><th></th></tr>
+          </thead>
+          <tbody>
+            {(criteria?.flags || []).map(f => (
+              <tr key={f.id}>
+                <td><span className={`pill ${FLAG_COLORS[f.color] || "pill-amber"}`}>{f.label}</span></td>
+                <td>{f.color}</td>
+                <td style={{ color: "var(--muted)", fontSize: 12 }}>{f.signal}</td>
+                <td><button className="btn btn-sm btn-danger" onClick={() => removeFlag(f.id)}>Remove</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {showAddFlag ? (
+        <div className="card" style={{ maxWidth: 480, marginBottom: 12 }}>
+          <div className="form-group">
+            <label className="form-label">Flag name</label>
+            <input value={newFlag.label} onChange={e => setNewFlag(p => ({ ...p, label: e.target.value }))} style={{ width: "100%" }} />
+          </div>
+          <div className="form-row">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Color</label>
+              <select value={newFlag.color} onChange={e => setNewFlag(p => ({ ...p, color: e.target.value }))} style={{ width: "100%" }}>
+                <option value="red">Red</option>
+                <option value="amber">Amber</option>
+                <option value="green">Green</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Signal description</label>
+            <textarea rows={2} value={newFlag.signal} onChange={e => setNewFlag(p => ({ ...p, signal: e.target.value }))} />
+          </div>
+          <div className="form-row">
+            <button className="btn btn-primary btn-sm" onClick={addFlag}>Add Flag</button>
+            <button className="btn btn-sm" onClick={() => setShowAddFlag(false)}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn btn-sm" style={{ marginBottom: 20 }} onClick={() => setShowAddFlag(true)}>+ Add flag</button>
+      )}
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 32 }}>
+        <button className="btn btn-primary" onClick={saveCriteria} disabled={saving}>
+          {saving && <span className="loader"></span>}{saved ? "Saved!" : "Save criteria to KV"}
+        </button>
+      </div>
+
+      <hr className="divider" />
+
+      {/* Email settings */}
+      <div className="section-title">Email Settings</div>
+      <div className="card" style={{ maxWidth: 400, marginBottom: 20 }}>
+        <div className="form-group">
+          <label className="form-label">Recipient</label>
+          <input value="jawadayaz@gmail.com" readOnly style={{ width: "100%", opacity: .7 }} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Send time</label>
+          <input value="05:00 IST (23:30 UTC)" readOnly style={{ width: "100%", opacity: .7 }} />
+        </div>
+        <button className="btn btn-sm" onClick={sendTestEmail} disabled={testEmailStatus === "sending"}>
+          {testEmailStatus === "sending" && <span className="loader"></span>}
+          {testEmailStatus === "sent" ? "Sent!" : testEmailStatus === "failed" ? "Failed — check MailChannels config" : "Send test email"}
+        </button>
+      </div>
+
+      <hr className="divider" />
+
+      {/* Cron status */}
+      <div className="section-title">Cron Status</div>
+      <div className="card" style={{ maxWidth: 500 }}>
+        {cronStatus ? (
+          <>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 4 }}>Worker version</div>
+              <strong>{cronStatus.workerVersion}</strong>
+            </div>
+            <div>
+              <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 4 }}>Last digest</div>
+              {cronStatus.lastDigest ? (
+                <span>{fmtDate(cronStatus.lastDigest.sentAt)} — <span className={cronStatus.lastDigest.status === "sent" ? "positive" : "negative"}>{cronStatus.lastDigest.status}</span></span>
+              ) : "No digest sent yet"}
+            </div>
+          </>
+        ) : (
+          <div style={{ color: "var(--muted)" }}>Loading cron status...</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── App ──────────────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab] = useState("screener");
+  const [criteria, setCriteria] = useState(null);
+  const [savedScreens, setSavedScreens] = useState([]);
+
+  useEffect(() => {
+    api("/api/criteria").then(c => { if (c?.filters) setCriteria(c); });
+    api("/api/screens").then(s => setSavedScreens(s || []));
+  }, []);
+
+  const TABS = [
+    { id: "screener", label: "Screener" },
+    { id: "watchlist", label: "Watchlist" },
+    { id: "screens", label: "Screens" },
+    { id: "settings", label: "Settings" },
+  ];
+
+  return (
+    <div className="app">
+      <header className="header">
+        <span className="header-logo">Stock Intel</span>
+        <span className="header-version">v01.00</span>
+        <nav className="nav">
+          {TABS.map(t => (
+            <button key={t.id} className={`nav-tab ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      <div className="main">
+        {tab === "screener" && <ScreenerTab criteria={criteria} savedScreens={savedScreens} setSavedScreens={setSavedScreens} />}
+        {tab === "watchlist" && <WatchlistTab />}
+        {tab === "screens" && <ScreensTab savedScreens={savedScreens} setSavedScreens={setSavedScreens} />}
+        {tab === "settings" && <SettingsTab criteria={criteria} setCriteria={setCriteria} />}
+      </div>
+
+      <footer className="footer">
+        Stock Intel v01.00 — Sunseeker Properties &nbsp;·&nbsp; Daily digest at 05:00 IST
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
