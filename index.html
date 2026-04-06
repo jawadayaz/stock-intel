@@ -335,9 +335,10 @@ function DeepDivePanel({ stock, onClose }) {
       </div>
       <div className="slide-panel-body">
         {isIndian && <div className="alert alert-error">Transcript analysis not available for Indian exchanges.</div>}
+        {result?.comingSoon && <div className="alert alert-error" style={{ color: "var(--amber)" }}>{result.message}</div>}
         {loading && !isIndian && <div className="inline-loader"><span className="loader"></span>Fetching SEC EDGAR filing and running analysis...</div>}
         {error && !loading && <div className="alert alert-error">{error}</div>}
-        {result && !loading && (
+        {result && !result.comingSoon && !loading && (
           <>
             <div className={`credibility-score ${scoreClass}`}>{result.credibilityScore ?? "—"}<span style={{ fontSize: 18 }}>/10</span></div>
             <div className="score-label">Management Credibility Score</div>

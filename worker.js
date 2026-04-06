@@ -320,6 +320,10 @@ async function sendDigestEmail(env, subject, html) {
 
 // ─── Layer 2 — Deep dive (SEC EDGAR) ────────────────────────────────────
 async function deepDive(env, ticker) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return { comingSoon: true, message: "AI analysis coming soon — add ANTHROPIC_API_KEY to enable deep dive." };
+  }
+
   // Fetch company profile for full name
   const profile = await finnhub(env, `/stock/profile2?symbol=${ticker}`);
   const companyName = profile?.name || ticker;
@@ -337,7 +341,6 @@ async function deepDive(env, ticker) {
   const filing = hits[0];
   const filingText = filing?._source?.file_date + " — " + (filing?._source?.entity_name || companyName) + ": " + (filing?._source?.period_of_report || "");
 
-  // Call Claude
   const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -386,29 +389,33 @@ async function cronWatchlistEnrichment(env) {
         continue;
       }
 
-      // Filter with Claude
-      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 1024,
-          messages: [{
-            role: "user",
-            content: `Filter this news list for ${item.ticker}. Keep only items that are meaningful (earnings, guidance, M&A, regulatory, leadership change, major contracts). Discard noise. For each kept item write a 2-sentence summary. Return JSON array of {headline, summary} objects. If nothing meaningful, return [].
+      let filteredNews;
+      if (!env.ANTHROPIC_API_KEY) {
+        // No API key — include all news items as-is
+        filteredNews = newsItems.map(n => ({ headline: n.headline, summary: n.summary || "" }));
+      } else {
+        // Filter and summarise with Claude
+        const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": env.ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 1024,
+            messages: [{
+              role: "user",
+              content: `Filter this news list for ${item.ticker}. Keep only items that are meaningful (earnings, guidance, M&A, regulatory, leadership change, major contracts). Discard noise. For each kept item write a 2-sentence summary. Return JSON array of {headline, summary} objects. If nothing meaningful, return [].
 
 News: ${JSON.stringify(newsItems.map(n => ({ headline: n.headline, summary: n.summary })))}`
-          }]
-        })
-      });
-
-      const claudeData = await claudeRes.json();
-      let filteredNews = [];
-      try { filteredNews = JSON.parse(claudeData?.content?.[0]?.text || "[]"); } catch {}
+            }]
+          })
+        });
+        const claudeData = await claudeRes.json();
+        try { filteredNews = JSON.parse(claudeData?.content?.[0]?.text || "[]"); } catch { filteredNews = []; }
+      }
 
       enriched.push({ ...item, stockData: stock, news: filteredNews, enrichedAt: Date.now() });
     } catch (e) {
