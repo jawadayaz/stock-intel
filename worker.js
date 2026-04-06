@@ -1,7 +1,7 @@
 // stock-intel Cloudflare Worker
-// Version: 01.00
+// Version: 01.01
 
-const WORKER_VERSION = "01.00";
+const WORKER_VERSION = "01.01";
 
 // ─── Rate limiter (token bucket, 60 req/min for Finnhub) ───────────────────
 class TokenBucket {
@@ -53,6 +53,45 @@ async function kvGet(env, key) {
 async function kvPut(env, key, val, ttl) {
   const opts = ttl ? { expirationTtl: ttl } : {};
   await env.STOCK_INTEL.put(key, JSON.stringify(val), opts);
+}
+
+// ─── Unified AI caller (Anthropic → Gemini fallback) ─────────────────────
+// Returns the text response string, or null if no AI available.
+async function callAI(env, userPrompt, systemPrompt = "") {
+  if (env.ANTHROPIC_API_KEY) {
+    const messages = [{ role: "user", content: userPrompt }];
+    const body = { model: "claude-sonnet-4-6", max_tokens: 1024, messages };
+    if (systemPrompt) body.system = systemPrompt;
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    return data?.content?.[0]?.text || null;
+  }
+
+  if (env.GEMINI_API_KEY) {
+    const contents = [];
+    if (systemPrompt) contents.push({ role: "user", parts: [{ text: systemPrompt }] }, { role: "model", parts: [{ text: "Understood." }] });
+    contents.push({ role: "user", parts: [{ text: userPrompt }] });
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents })
+      }
+    );
+    const data = await res.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  }
+
+  return null; // No AI configured
 }
 
 // ─── Criteria defaults (inlined — Workers have no filesystem) ─────────────
@@ -349,8 +388,8 @@ async function sendDigestEmail(env, subject, html) {
 
 // ─── Layer 2 — Deep dive (SEC EDGAR) ────────────────────────────────────
 async function deepDive(env, ticker) {
-  if (!env.ANTHROPIC_API_KEY) {
-    return { comingSoon: true, message: "AI analysis coming soon — add ANTHROPIC_API_KEY to enable deep dive." };
+  if (!env.ANTHROPIC_API_KEY && !env.GEMINI_API_KEY) {
+    return { comingSoon: true, message: "AI analysis coming soon — add ANTHROPIC_API_KEY or GEMINI_API_KEY to enable deep dive." };
   }
 
   // Fetch company profile for full name
@@ -370,30 +409,17 @@ async function deepDive(env, ticker) {
   const filing = hits[0];
   const filingText = filing?._source?.file_date + " — " + (filing?._source?.entity_name || companyName) + ": " + (filing?._source?.period_of_report || "");
 
-  const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      system: "You are analyzing an earnings call transcript or 8-K filing. Score management's explanation for any miss on a scale of 1-10 (10 = highly credible, specific, quantified reasons; 1 = vague, blame-shifting, unconvincing). Extract: (a) stated reasons for miss, (b) forward guidance language, (c) any hedging or qualifying language. Flag sentences that seem evasive. Return valid JSON only.",
-      messages: [{
-        role: "user",
-        content: `Analyze this filing excerpt and return JSON with keys: credibilityScore (number 1-10), missReasons (string[]), guidanceTone (string), hedgingFlags (string[]), keyQuotes (string[]).\n\nFiling: ${filingText}\n\nIf you cannot determine a miss, set credibilityScore to null and note that in guidanceTone.`
-      }]
-    })
-  });
+  const aiText = await callAI(env,
+    `Analyze this filing excerpt and return JSON with keys: credibilityScore (number 1-10), missReasons (string[]), guidanceTone (string), hedgingFlags (string[]), keyQuotes (string[]). Return only valid JSON, no other text.\n\nFiling: ${filingText}\n\nIf you cannot determine a miss, set credibilityScore to null and note that in guidanceTone.`,
+    "You are analyzing an earnings call transcript or 8-K filing. Score management's explanation for any miss on a scale of 1-10 (10 = highly credible, specific, quantified reasons; 1 = vague, blame-shifting, unconvincing). Extract: (a) stated reasons for miss, (b) forward guidance language, (c) any hedging or qualifying language. Flag sentences that seem evasive. Return valid JSON only."
+  );
 
-  const claudeData = await claudeRes.json();
-  const content = claudeData?.content?.[0]?.text || "{}";
+  if (!aiText) return { error: "AI call failed" };
   try {
-    return JSON.parse(content);
+    const clean = aiText.replace(/```json|```/g, "").trim();
+    return JSON.parse(clean);
   } catch {
-    return { credibilityScore: null, missReasons: [], guidanceTone: content, hedgingFlags: [], keyQuotes: [] };
+    return { credibilityScore: null, missReasons: [], guidanceTone: aiText, hedgingFlags: [], keyQuotes: [] };
   }
 }
 
@@ -419,31 +445,20 @@ async function cronWatchlistEnrichment(env) {
       }
 
       let filteredNews;
-      if (!env.ANTHROPIC_API_KEY) {
-        // No API key — include all news items as-is
-        filteredNews = newsItems.map(n => ({ headline: n.headline, summary: n.summary || "" }));
-      } else {
-        // Filter and summarise with Claude
-        const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "x-api-key": env.ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 1024,
-            messages: [{
-              role: "user",
-              content: `Filter this news list for ${item.ticker}. Keep only items that are meaningful (earnings, guidance, M&A, regulatory, leadership change, major contracts). Discard noise. For each kept item write a 2-sentence summary. Return JSON array of {headline, summary} objects. If nothing meaningful, return [].
+      const aiText = await callAI(env,
+        `Filter this news list for ${item.ticker}. Keep only items that are meaningful (earnings, guidance, M&A, regulatory, leadership change, major contracts). Discard noise. For each kept item write a 2-sentence summary. Return a JSON array of {headline, summary} objects only — no other text. If nothing meaningful, return [].
 
-News: ${JSON.stringify(newsItems.map(n => ({ headline: n.headline, summary: n.summary })))}`
-            }]
-          })
-        });
-        const claudeData = await claudeRes.json();
-        try { filteredNews = JSON.parse(claudeData?.content?.[0]?.text || "[]"); } catch { filteredNews = []; }
+News: ${JSON.stringify(newsItems.map(n => ({ headline: n.headline, summary: n.summary })))}`,
+        "You are a financial news filter. Return only valid JSON arrays."
+      );
+      if (aiText) {
+        try {
+          const clean = aiText.replace(/```json|```/g, "").trim();
+          filteredNews = JSON.parse(clean);
+        } catch { filteredNews = newsItems.map(n => ({ headline: n.headline, summary: n.summary || "" })); }
+      } else {
+        // No AI configured — include all items as-is
+        filteredNews = newsItems.map(n => ({ headline: n.headline, summary: n.summary || "" }));
       }
 
       enriched.push({ ...item, stockData: stock, news: filteredNews, enrichedAt: Date.now() });
