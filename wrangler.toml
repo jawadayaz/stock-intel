@@ -6,5 +6,21 @@ compatibility_date = "2024-01-01"
 binding = "STOCK_INTEL"
 id = "7c8adfc91cf44abfbae12b5ce0cfd182"
 
+[vars]
+ENVIRONMENT = "production"
+
 [triggers]
+crons = ["0 23 * * *", "15 23 * * *", "30 23 * * *"]
+
+[env.preview]
+name = "stock-intel-worker-preview"
+
+[[env.preview.kv_namespaces]]
+binding = "STOCK_INTEL"
+id = "0b19cc92142e4b9b8c027315650334f0"
+
+[env.preview.vars]
+ENVIRONMENT = "preview"
+
+[env.preview.triggers]
 crons = ["0 23 * * *", "15 23 * * *", "30 23 * * *"]

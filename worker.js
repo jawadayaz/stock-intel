@@ -1,7 +1,7 @@
 // stock-intel Cloudflare Worker
-// Version: 01.01
+// Version: 01.02
 
-const WORKER_VERSION = "01.01";
+const WORKER_VERSION = "01.02";
 
 // ─── Rate limiter (token bucket, 60 req/min for Finnhub) ───────────────────
 class TokenBucket {
@@ -598,6 +598,11 @@ async function handleRequest(request, env) {
   if (method === "OPTIONS") return new Response(null, { headers: corsHeaders() });
 
   await ensureCriteriaSeeded(env);
+
+  // GET /api/health
+  if (path === "/api/health") {
+    return json({ status: "ok", version: WORKER_VERSION, environment: env.ENVIRONMENT || "production" });
+  }
 
   // GET /api/version
   if (path === "/api/version") return json({ version: WORKER_VERSION });
