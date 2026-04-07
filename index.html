@@ -146,7 +146,7 @@
 const { useState, useEffect, useRef, useCallback } = React;
 
 // ─── Config ───────────────────────────────────────────────────────────────
-const WORKER_URL = "https://stock-intel-worker-preview.jawadayaz.workers.dev";
+const WORKER_URL = "https://stock-intel-worker.jawadayaz.workers.dev";
 
 // ─── API helpers ──────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
@@ -377,17 +377,23 @@ function DeepDivePanel({ stock, onClose }) {
 }
 
 // ─── Screener tab ─────────────────────────────────────────────────────────
+const LS_SCREEN = "si_screen_state";
 function ScreenerTab({ criteria, savedScreens, setSavedScreens }) {
-  const [universe, setUniverse] = useState("SP500_NASDAQ");
-  const [activeFilters, setActiveFilters] = useState([]);
-  const [activeFlags, setActiveFlags] = useState([]);
-  const [requiredFlags, setRequiredFlags] = useState([]);
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(LS_SCREEN)) || {}; } catch { return {}; } })();
+  const [universe, setUniverse] = useState(saved.universe || "SP500_NASDAQ");
+  const [activeFilters, setActiveFilters] = useState(saved.activeFilters || []);
+  const [activeFlags, setActiveFlags] = useState(saved.activeFlags || []);
+  const [requiredFlags, setRequiredFlags] = useState(saved.requiredFlags || []);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [sortKey, setSortKey] = useState("marketCap");
   const [sortDir, setSortDir] = useState(-1);
   const [deepDiveStock, setDeepDiveStock] = useState(null);
   const [error, setError] = useState(null);
+
+  React.useEffect(() => {
+    localStorage.setItem(LS_SCREEN, JSON.stringify({ universe, activeFilters, activeFlags, requiredFlags }));
+  }, [universe, activeFilters, activeFlags, requiredFlags]);
 
   async function runScreen() {
     setLoading(true); setError(null); setResults(null);
