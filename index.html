@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stock Intel v01.01</title>
+<title>Stock Intel v01.04</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -406,6 +406,13 @@ function ScreenerTab({ criteria, savedScreens, setSavedScreens }) {
     setLoading(false);
   }
 
+  const [warming, setWarming] = React.useState(false);
+  async function warmCache() {
+    setWarming(true);
+    try { await api("/api/warm-cache", { method: "POST" }); } catch (e) {}
+    setWarming(false);
+  }
+
   async function addToWatchlist(stock) {
     await api("/api/watchlist", { method: "POST", body: JSON.stringify({ ticker: stock.ticker, name: stock.name, exchange: stock.exchange }) });
   }
@@ -470,6 +477,12 @@ function ScreenerTab({ criteria, savedScreens, setSavedScreens }) {
             {loading && <span className="loader"></span>}
             Run Screen
           </button>
+          <button className="btn btn-sm" onClick={warmCache} disabled={warming} title="Fetch latest data for all universe stocks (runs in background, takes ~2 min)">
+            {warming ? "Warming..." : "Warm Cache"}
+          </button>
+        </div>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8 }}>
+          Screens only match stocks with cached data. Cache warms nightly at 3:30 AM IST, or click Warm Cache to refresh now.
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
@@ -961,7 +974,7 @@ function App() {
     <div className="app">
       <header className="header">
         <span className="header-logo">Stock Intel</span>
-        <span className="header-version">v01.01</span>
+        <span className="header-version">v01.04</span>
         <nav className="nav">
           {TABS.map(t => (
             <button key={t.id} className={`nav-tab ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)}>
@@ -979,7 +992,7 @@ function App() {
       </div>
 
       <footer className="footer">
-        Stock Intel v01.01 — Sunseeker Properties &nbsp;·&nbsp; Daily digest at 05:00 IST
+        Stock Intel v01.04 — Sunseeker Properties &nbsp;·&nbsp; Daily digest at 05:00 IST
       </footer>
     </div>
   );
