@@ -21,3 +21,6 @@ id = "0b19cc92142e4b9b8c027315650334f0"
 
 [env.preview.vars]
 ENVIRONMENT = "preview"
+
+[env.preview.triggers]
+crons = []
